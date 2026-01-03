@@ -2,3 +2,5 @@ name = "solara"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "."
 
+[vars]
+GOOGLE_CLIENT_ID = "286622437262-7navaci60dfuh71ftfceaicr52b8eqqf.apps.googleusercontent.com"
