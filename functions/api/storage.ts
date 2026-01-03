@@ -48,16 +48,42 @@ function getTableForKey(key: string): TableName {
   return TABLES.playback;
 }
 
+function getUserIdFromRequest(request: Request): string | null {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies: Record<string, string> = {};
+  cookieHeader.split(";").forEach((part) => {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex === -1) return;
+    const key = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (key) cookies[key] = value;
+  });
+
+  const googleAuth = cookies.google_auth;
+  if (googleAuth) {
+    try {
+      const sessionData = JSON.parse(atob(googleAuth));
+      if (sessionData.exp && sessionData.exp > Date.now() && sessionData.userId) {
+        return sessionData.userId;
+      }
+    } catch (error) {
+      // Invalid session
+    }
+  }
+
+  return null;
+}
+
 async function ensureTables(env: Env): Promise<void> {
   if (!hasD1(env)) {
     return;
   }
   const createStatements = [
     env.DB.prepare(
-      "CREATE TABLE IF NOT EXISTS playback_store (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+      "CREATE TABLE IF NOT EXISTS playback_store (user_id TEXT, key TEXT, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, key))"
     ),
     env.DB.prepare(
-      "CREATE TABLE IF NOT EXISTS favorites_store (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+      "CREATE TABLE IF NOT EXISTS favorites_store (user_id TEXT, key TEXT, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, key))"
     ),
   ];
   await env.DB.batch(createStatements);
@@ -67,6 +93,11 @@ async function handleGet(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (!hasD1(env)) {
     return jsonResponse({ d1Available: false, data: {} });
+  }
+
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return jsonResponse({ d1Available: false, data: {}, error: "Not authenticated" });
   }
 
   const statusOnly = url.searchParams.get("status");
@@ -99,8 +130,8 @@ async function handleGet(request: Request, env: Env): Promise<Response> {
       if (tableKeys.length === 0) continue;
       const placeholders = tableKeys.map(() => "?").join(",");
       const statement = env.DB.prepare(
-        `SELECT key, value FROM ${table} WHERE key IN (${placeholders})`
-      ).bind(...tableKeys);
+        `SELECT key, value FROM ${table} WHERE user_id = ? AND key IN (${placeholders})`
+      ).bind(userId, ...tableKeys);
       const result = await statement.all();
       const rowsResult = (result as any).results || result.results || [];
       results.push(...rowsResult);
@@ -111,11 +142,11 @@ async function handleGet(request: Request, env: Env): Promise<Response> {
     });
   } else {
     const playbackResult = await env.DB.prepare(
-      "SELECT key, value FROM playback_store"
-    ).all();
+      "SELECT key, value FROM playback_store WHERE user_id = ?"
+    ).bind(userId).all();
     const favoriteResult = await env.DB.prepare(
-      "SELECT key, value FROM favorites_store"
-    ).all();
+      "SELECT key, value FROM favorites_store WHERE user_id = ?"
+    ).bind(userId).all();
     rows = [
       ...(((playbackResult as any).results || playbackResult.results || []) as any[]),
       ...(((favoriteResult as any).results || favoriteResult.results || []) as any[]),
@@ -133,6 +164,11 @@ async function handleGet(request: Request, env: Env): Promise<Response> {
 async function handlePost(request: Request, env: Env): Promise<Response> {
   if (!hasD1(env)) {
     return jsonResponse({ d1Available: false, data: {} });
+  }
+
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return jsonResponse({ d1Available: false, data: {}, error: "Not authenticated" });
   }
 
   const body = (await request.json().catch(() => ({}))) as JsonBody;
@@ -159,8 +195,8 @@ async function handlePost(request: Request, env: Env): Promise<Response> {
     const table = getTableForKey(key);
     groupedStatements[table].push(
       env.DB.prepare(
-        `INSERT INTO ${table} (key, value, updated_at) VALUES (?1, ?2, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-      ).bind(key, storedValue)
+        `INSERT INTO ${table} (user_id, key, value, updated_at) VALUES (?1, ?2, ?3, datetime('now')) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+      ).bind(userId, key, storedValue)
     );
   });
 
@@ -178,6 +214,11 @@ async function handlePost(request: Request, env: Env): Promise<Response> {
 async function handleDelete(request: Request, env: Env): Promise<Response> {
   if (!hasD1(env)) {
     return jsonResponse({ d1Available: false });
+  }
+
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return jsonResponse({ d1Available: false, error: "Not authenticated" });
   }
 
   const body = (await request.json().catch(() => ({}))) as JsonBody;
@@ -199,7 +240,7 @@ async function handleDelete(request: Request, env: Env): Promise<Response> {
   keys.forEach((key) => {
     const table = getTableForKey(key);
     groupedStatements[table].push(
-      env.DB.prepare(`DELETE FROM ${table} WHERE key = ?1`).bind(key)
+      env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?1 AND key = ?2`).bind(userId, key)
     );
   });
 

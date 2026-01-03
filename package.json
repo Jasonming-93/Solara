@@ -1,0 +1,12 @@
+{
+  "name": "solara",
+  "version": "1.0.0",
+  "description": "Solara Music Player",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "deploy": "wrangler pages deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.54.0"
+  }
+}

@@ -1,4 +1,4 @@
-const PUBLIC_PATH_PATTERNS = [/^\/login(?:\/|$)/, /^\/api\/login(?:\/|$)/];
+const PUBLIC_PATH_PATTERNS = [/^\/login(?:\/|$)/, /^\/api\/login(?:\/|$)/, /^\/api\/google-auth(?:\/|$)/];
 const PUBLIC_FILE_EXTENSIONS = new Set([
   ".css",
   ".js",
@@ -60,8 +60,22 @@ export async function onRequest(context: any) {
     }
   });
 
+  // Check password auth
   if (cookies.auth && cookies.auth === btoa(password)) {
     return context.next();
+  }
+
+  // Check Google auth
+  const googleAuth = cookies.google_auth;
+  if (googleAuth) {
+    try {
+      const sessionData = JSON.parse(atob(googleAuth));
+      if (sessionData.exp && sessionData.exp > Date.now()) {
+        return context.next();
+      }
+    } catch (error) {
+      // Invalid session, continue to login
+    }
   }
 
   const loginUrl = new URL("/login", url);

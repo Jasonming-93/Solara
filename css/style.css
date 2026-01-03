@@ -163,6 +163,56 @@ body.background-transitioning .background-stage__layer--transition {
     font-style: italic; 
 }
 
+.user-info-wrapper {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+    color: var(--text-secondary-color);
+}
+
+.user-avatar {
+    border-radius: 50%;
+    border: 2px solid var(--primary-color);
+}
+
+.user-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.logout-btn {
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background: rgba(231, 76, 60, 0.3) !important;
+    border-color: var(--warning-color) !important;
+}
+
+.footer-info {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: 10px 20px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.footer-info .warning {
+    color: var(--text-secondary-color);
+    font-size: 0.85em;
+    font-style: italic;
+    opacity: 0.8;
+}
+
 /* 搜索区域样式 - 增强动效 */
 .search-area {
     grid-area: search;

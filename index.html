@@ -118,7 +118,13 @@
         </div>
         <div class="header">
             <h1>Solara</h1>
-            <div class="warning">Made by Wet Dream Boy，免费API来自GD音乐台(music.gdstudio.xyz)，仅供学习交流使用，请支持正版音乐奥！</div>
+            <div class="user-info-wrapper" id="userInfoWrapper" style="display: none;">
+                <div class="user-info" id="userInfo">
+                    <img id="userAvatar" src="" alt="" class="user-avatar" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 8px;">
+                    <span id="userName" class="user-name"></span>
+                    <button id="logoutBtn" class="logout-btn" style="margin-left: 12px; padding: 4px 12px; background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.4); border-radius: 8px; color: var(--warning-color); cursor: pointer; font-size: 0.85em;">登出</button>
+                </div>
+            </div>
             <div class="theme-switch-wrapper">
                 <button id="themeToggleButton" class="theme-toggle-button" type="button" aria-label="切换深浅色模式">
                     <i class="fas fa-sun theme-icon theme-icon--sun" aria-hidden="true"></i>
@@ -501,6 +507,10 @@
 
     <div class="mobile-overlay-scrim" id="mobileOverlayScrim"></div>
 
+    <footer class="footer-info">
+        <div class="warning"></div>
+    </footer>
+
     <audio id="audioPlayer" preload="metadata" playsinline></audio>
 
 <!-- 通知容器 -->
@@ -510,6 +520,65 @@
 <div id="debugInfo" class="debug-info"></div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // User authentication and info display
+    (function() {
+        const userInfoWrapper = document.getElementById('userInfoWrapper');
+        const userInfo = document.getElementById('userInfo');
+        const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/google-auth', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.authenticated && data.user) {
+                    if (userInfoWrapper) userInfoWrapper.style.display = 'block';
+                    if (userName) userName.textContent = data.user.name || data.user.email;
+                    if (userAvatar && data.user.picture) {
+                        userAvatar.src = data.user.picture;
+                        userAvatar.style.display = 'block';
+                    } else if (userAvatar) {
+                        userAvatar.style.display = 'none';
+                    }
+                } else {
+                    if (userInfoWrapper) userInfoWrapper.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                if (userInfoWrapper) userInfoWrapper.style.display = 'none';
+            }
+        }
+
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/google-auth?action=logout', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    
+                    if (response.ok) {
+                        window.location.href = '/login';
+                    } else {
+                        alert('登出失败，请重试');
+                    }
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('登出出错，请稍后再试');
+                }
+            });
+        }
+
+        // Check auth status on page load
+        checkAuthStatus();
+    })();
+</script>
 <script src="js/index.js"></script>
 <script>
     if (window.__SOLARA_IS_MOBILE) {
